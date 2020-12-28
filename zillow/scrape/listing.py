@@ -150,6 +150,12 @@ class ListingScraper():
 			'baths': -1,
 			'description': '',
 			'type': '',
+			'built_year': -1,
+			'heating': '',
+			'cooling': '',
+			'hoa_monthly': -1,
+			'lot_sqft': -1,
+			'parking': [],
 		}
 		page = BeautifulSoup(listing_html,'html.parser')
 		summary = page.find('div',{'class':'ds-summary-row'})
@@ -189,5 +195,38 @@ class ListingScraper():
 				mls = title_part.replace('MLS #','')
 				details['mls'] = mls.strip()
 				break
+
+		# parse list of home facts
+		facts = page.find('ul',{'class':'ds-home-fact-list'})
+		for fact in facts.findChildren():
+			fact_children = fact.findChildren()
+			if len(fact_children) == 0:
+				continue
+
+			icon = fact_children[0]
+			icon_classes = icon.attrs['class']
+			try:
+				if 'zsg-icon-heat' in icon_classes:
+					details['heating'] = fact_children[2].getText()
+				elif 'zsg-icon-snowflake' in icon_classes:
+					details['cooling'] = fact_children[2].getText()
+				elif 'zsg-icon-calendar' in icon_classes:
+					details['built_year'] = int(fact_children[2].getText())
+				elif 'zsg-icon-lot' in icon_classes:
+					lot_size = fact_children[2].getText().replace('sqft','')
+					lot_size = lot_size.strip()
+					details['lot_sqft'] = parse_comma_num(lot_size)
+				elif 'zsg-icon-parking' in icon_classes:
+					details['parking'] = fact_children[2].getText().split(',')
+				elif 'zsg-icon-hoa' in icon_classes:
+					hoa = fact_children[2].getText().replace('/mo','')
+					details['hoa_monthly'] = parse_price(hoa)
+			except ValueError as ve:
+				if 'No Data' in str(ve):
+					# zillow will place 'No Data' in some of the
+					# fact fields. this is an expected exception
+					pass
+				else:
+					raise ve
 
 		return details
