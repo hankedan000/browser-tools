@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import selenium
 import sys
+import scrape.utils as zutils
 from scrape.session import *
 from bs4 import BeautifulSoup
 
@@ -79,12 +80,7 @@ class ListingScraper():
 		# parse zpid from listing url
 		url = get_meta_content(head,'og:url')
 		details['url'] = url
-		zpid_idx = url.find('_zpid')
-		if zpid_idx >= 0:
-			slash_idx = url.rfind('/',0,zpid_idx)
-			details['zpid'] = url[slash_idx+1:zpid_idx]
-		else:
-			raise RuntimeError("Couldn't find zpid in url '%s'" % url)
+		details['zpid'] = zutils.zpid_from_url(url)
 
 		# parse MLS # from title
 		title = get_meta_content(head,'og:title')

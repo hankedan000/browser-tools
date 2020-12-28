@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import json
 import selenium
-import sys
 import os
 from bs4 import BeautifulSoup
 from selenium import webdriver
