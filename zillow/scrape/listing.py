@@ -105,6 +105,17 @@ class ZillowSession():
 			}
 			json.dump(session_info,file)
 
+def parse_comma_num(comma_num_text):
+	num_text = comma_num_text.replace(',','')
+	return float(num_text)
+
+def parse_price(price_text):
+	price_text = price_text.replace('$','')
+	return parse_comma_num(price_text)
+
+def get_meta_content(head_soup,prop_name):
+	return head_soup.find('meta',property=prop_name).attrs['content']
+
 class ListingScraper():
 	def __init__(self):
 		self.session = ZillowSession()
@@ -112,28 +123,71 @@ class ListingScraper():
 	def driver(self):
 		return self.session.driver
 
-	def get_statement_selector(self):
-		return self.driver().find_element_by_id('eddstatementsnew.selecteddocument')
+	def write_html(self,filepath='listing.html'):
+		with open(filepath,'w') as f:
+			f.write(self.driver().page_source)
 
-	def get_statement_options(self,selector):
-		soup = BeautifulSoup(selector.get_attribute('innerHTML'),'html.parser')
-		return soup.find_all('option')
+	def get_details_from_file(self,filepath='listing.html'):
+		with open(filepath,'r') as f:
+			page_source = f.read()
+			return self.parse_details_from_html(page_source)
 
-	def start(self):
-		pass
-		# # waits for user to login
-		# self.session.login()
-		# # waits for user to select bank account
-		# self.session.select_bank_account()
+	def get_details_from_url(self,listing_url):
+		self.session.get(listing_url)
+		return self.parse_details_from_html(self.driver().page_source)
 
-		# selector = self.get_statement_selector()
-		# options = self.get_statement_options(selector)
-		# options = options[1:]# first option is just "select-item"
-		# print('Downloading %d statement(s)...' % len(options))
-		# for option in tqdm.tqdm(options):
-		# 	value = option.attrs['value']
-		# 	option_elem = selector.find_element_by_xpath(
-		# 		"option[text()='%s']" % option.text)
-		# 	option_elem.click()
+	def parse_details_from_html(self,listing_html):
+		DEBUG = False
+		details = {
+			'zpid': '',
+			'mls': '',
+			'url': '',
+			'price': -1,
+			'currency': 'USD',
+			'sqft': -1,
+			'address': '',
+			'beds': -1,
+			'baths': -1,
+			'description': '',
+			'type': '',
+		}
+		page = BeautifulSoup(listing_html,'html.parser')
+		summary = page.find('div',{'class':'ds-summary-row'})
+		summary_children = summary.findChildren()
+		if DEBUG:
+			print('-------------- SUMMARY --------------')
+			idx = 0
+			for child in summary_children:
+				print('%d: %s' % (idx,child))
+				idx += 1
+		details['sqft'] = parse_comma_num(summary_children[15].getText())
 
-		# 	time.sleep(5)
+		head = page.find('head')
+		details['price'] = float(get_meta_content(head,'product:price:amount'))
+		details['currency'] = get_meta_content(head,'product:price:currency')
+		details['address'] = get_meta_content(head,'og:zillow_fb:address')
+		details['beds'] = int(get_meta_content(head,'zillow_fb:beds'))
+		details['baths'] = int(get_meta_content(head,'zillow_fb:baths'))
+		details['description'] = get_meta_content(head,'zillow_fb:description')
+		details['type'] = get_meta_content(head,'og:type')
+
+		# parse zpid from listing url
+		url = get_meta_content(head,'og:url')
+		details['url'] = url
+		zpid_idx = url.find('_zpid')
+		if zpid_idx >= 0:
+			slash_idx = url.rfind('/',0,zpid_idx)
+			details['zpid'] = url[slash_idx+1:zpid_idx]
+		else:
+			raise RuntimeError("Couldn't find zpid in url '%s'" % url)
+
+		# parse MLS # from title
+		title = get_meta_content(head,'og:title')
+		title_parts = title.split('|')
+		for title_part in title_parts:
+			if 'MLS #' in title_part:
+				mls = title_part.replace('MLS #','')
+				details['mls'] = mls.strip()
+				break
+
+		return details
