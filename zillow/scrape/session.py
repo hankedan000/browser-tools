@@ -14,6 +14,14 @@ DATA_DIR = 'data/scrape'
 if not os.path.exists(DATA_DIR):
 	os.makedirs(DATA_DIR)
 
+class CaptchaError(RuntimeError):
+	def __init__(self, message='CaptchaError', errors=[]):
+		# Call the base class constructor with the parameters it needs
+		super(CaptchaError, self).__init__(message)
+
+		# Now for your custom code...
+		self.errors = errors
+
 # simple class used to throttle submission rate
 class SubmitThrottle():
 	def __init__(self,period):

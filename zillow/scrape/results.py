@@ -13,8 +13,11 @@ def get_classes(soup):
 		return []
 
 class ResultsScraper():
-	def __init__(self):
-		self.session = ZillowSession()
+	def __init__(self,**kwargs):
+		if 'session' in kwargs:
+			self.session = kwargs['session']
+		else:
+			self.session = ZillowSession()
 
 	def driver(self):
 		return self.session.driver
@@ -101,6 +104,5 @@ class ResultsScraper():
 			listing_url = list_card_link.attrs['href']
 			zpid = zutils.zpid_from_url(listing_url)
 			results.append(listing_url)
-		print('results_count = %d' % len(results))
 
 		return results

@@ -5,20 +5,26 @@ import scrape.utils as zutils
 from scrape.session import *
 from bs4 import BeautifulSoup
 
-def parse_comma_num(comma_num_text):
-	num_text = comma_num_text.replace(',','')
-	return float(num_text)
+def parse_comma_num(comma_num_text,**kwargs):
+	default = kwargs.get('default',None)
+	try:
+		return float(comma_num_text.replace(',',''))
+	except:
+		return default
 
 def parse_price(price_text):
 	price_text = price_text.replace('$','')
-	return parse_comma_num(price_text)
+	return parse_comma_num(price_text,default=0.0)
 
 def get_meta_content(head_soup,prop_name):
 	return head_soup.find('meta',property=prop_name).attrs['content']
 
 class ListingScraper():
-	def __init__(self):
-		self.session = ZillowSession()
+	def __init__(self,**kwargs):
+		if 'session' in kwargs:
+			self.session = kwargs['session']
+		else:
+			self.session = ZillowSession()
 
 	def driver(self):
 		return self.session.driver
@@ -34,6 +40,9 @@ class ListingScraper():
 
 	def get_details_from_url(self,listing_url):
 		self.session.get(listing_url)
+		return self.parse_details_from_html(self.driver().page_source)
+
+	def get_details_from_page(self):
 		return self.parse_details_from_html(self.driver().page_source)
 
 	def parse_details_from_html(self,listing_html):
@@ -54,19 +63,28 @@ class ListingScraper():
 			'heating': '',
 			'cooling': '',
 			'hoa_monthly': -1,
-			'lot_sqft': -1,
+			'lot_size': '',
 			'parking': [],
 		}
 		page = BeautifulSoup(listing_html,'html.parser')
+
+		captcha = page.find('div',{'class':'captcha-container'})
+		if captcha:
+			raise CaptchaError()
+
 		summary = page.find('div',{'class':'ds-summary-row'})
-		summary_children = summary.findChildren()
+		summary_children = []
+		if summary:
+			summary.findChildren()
 		if DEBUG:
 			print('-------------- SUMMARY --------------')
 			idx = 0
 			for child in summary_children:
 				print('%d: %s' % (idx,child))
 				idx += 1
-		details['sqft'] = parse_comma_num(summary_children[15].getText())
+		if len(summary_children) >= 16:
+			sqft = summary_children[15].getText().replace('sqft','')
+			details['sqft'] = parse_comma_num(sqft,default=0.0)
 
 		head = page.find('head')
 		details['price'] = float(get_meta_content(head,'product:price:amount'))
@@ -106,11 +124,9 @@ class ListingScraper():
 				elif 'zsg-icon-snowflake' in icon_classes:
 					details['cooling'] = fact_children[2].getText()
 				elif 'zsg-icon-calendar' in icon_classes:
-					details['built_year'] = int(fact_children[2].getText())
+					details['built_year'] = parse_comma_num(fact_children[2].getText(),default=0)
 				elif 'zsg-icon-lot' in icon_classes:
-					lot_size = fact_children[2].getText().replace('sqft','')
-					lot_size = lot_size.strip()
-					details['lot_sqft'] = parse_comma_num(lot_size)
+					details['lot_size'] = fact_children[2].getText()
 				elif 'zsg-icon-parking' in icon_classes:
 					details['parking'] = fact_children[2].getText().split(',')
 				elif 'zsg-icon-hoa' in icon_classes:
