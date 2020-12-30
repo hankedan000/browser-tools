@@ -3,6 +3,7 @@ import os
 import traceback
 import json
 import argparse
+import requests
 import scrape.utils as zutils
 from tqdm import tqdm
 from scrape.listing import *
@@ -44,6 +45,11 @@ if __name__ == '__main__':
 		action='store_true',default=False,
 		help='forces a reparse of all stored HTML')
 
+	parser.add_argument(
+		'--dl-images',
+		action='store_true',default=False,
+		help='downloads images from listing')
+
 	args = parser.parse_args()
 
 	zrs = ResultsScraper()
@@ -82,6 +88,7 @@ if __name__ == '__main__':
 		listing_dir = os.path.join(LISTING_DATA_DIR,zpid)
 		listing_data_filepath = os.path.join(listing_dir,'listing_data.json')
 		listing_html_filepath = os.path.join(listing_dir,'listing.html')
+		listing_images_dir = os.path.join(listing_dir,'images')
 
 		if not os.path.exists(listing_dir):
 			# make dir if it doesn't exist already
@@ -117,3 +124,17 @@ if __name__ == '__main__':
 		if details:
 			with open(listing_data_filepath,'w') as f:
 				json.dump(details,f,indent=4)
+
+			if args.dl_images:
+				# make images dir if it doesn't exist
+				if not os.path.exists(listing_images_dir):
+					os.makedirs(listing_images_dir)
+
+				# download and save all listing images
+				for img_url in details['image_urls']:
+					img_data = requests.get(img_url).content
+					url_parts = img_url.split('/')
+					img_filename = url_parts[-1]
+					img_filepath = os.path.join(listing_images_dir,img_filename)
+					with open(img_filepath,'wb') as f:
+						f.write(img_data)

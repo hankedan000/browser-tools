@@ -33,20 +33,20 @@ class ListingScraper():
 		with open(filepath,'w') as f:
 			f.write(self.driver().page_source)
 
-	def get_details_from_file(self,filepath='listing.html'):
+	def get_details_from_file(self,filepath='listing.html',**kwargs):
 		with open(filepath,'r') as f:
 			page_source = f.read()
-			return self.parse_details_from_html(page_source)
+			return self.parse_details_from_html(page_source,**kwargs)
 
-	def get_details_from_url(self,listing_url):
+	def get_details_from_url(self,listing_url,**kwargs):
 		self.session.get(listing_url)
-		return self.parse_details_from_html(self.driver().page_source)
+		return self.parse_details_from_html(self.driver().page_source,**kwargs)
 
-	def get_details_from_page(self):
-		return self.parse_details_from_html(self.driver().page_source)
+	def get_details_from_page(self,**kwargs):
+		return self.parse_details_from_html(self.driver().page_source,**kwargs)
 
-	def parse_details_from_html(self,listing_html):
-		DEBUG = False
+	def parse_details_from_html(self,listing_html,**kwargs):
+		DEBUG = kwargs.get('debug',False)
 		details = {
 			'zpid': '',
 			'mls': '',
@@ -60,11 +60,13 @@ class ListingScraper():
 			'description': '',
 			'type': '',
 			'built_year': -1,
-			'heating': '',
-			'cooling': '',
+			'heating': 'No Data',
+			'cooling': 'No Data',
 			'hoa_monthly': -1,
 			'lot_size': '',
 			'parking': [],
+			'image_urls': [],
+			'image_files': [],
 		}
 		page = BeautifulSoup(listing_html,'html.parser')
 
@@ -111,7 +113,10 @@ class ListingScraper():
 
 		# parse list of home facts
 		facts = page.find('ul',{'class':'ds-home-fact-list'})
-		for fact in facts.findChildren():
+		facts_children = []
+		if facts:
+			facts_children = facts.findChildren()
+		for fact in facts_children:
 			fact_children = fact.findChildren()
 			if len(fact_children) == 0:
 				continue
@@ -139,5 +144,18 @@ class ListingScraper():
 					pass
 				else:
 					raise ve
+
+		# parse list of images
+		media = page.find('ul',{'class':'media-stream'})
+		media_lis = []
+		if media:
+			media_lis = media.findAll('li')
+		for media_li in media_lis:
+			img = media_li.find('img')
+			if img:
+				img_url = img.attrs['src']
+				url_parts = img_url.split('/')
+				details['image_urls'].append(img_url)
+				details['image_files'].append(url_parts[-1])
 
 		return details
