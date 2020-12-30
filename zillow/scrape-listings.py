@@ -39,6 +39,11 @@ if __name__ == '__main__':
 		type=argparse.FileType('r'),
 		help='parse listing reults from json file')
 
+	parser.add_argument(
+		'--force-reparse',
+		action='store_true',default=False,
+		help='forces a reparse of all stored HTML')
+
 	args = parser.parse_args()
 
 	zrs = ResultsScraper()
@@ -83,9 +88,10 @@ if __name__ == '__main__':
 			os.makedirs(listing_dir)
 
 		if os.path.exists(listing_data_filepath):
-			# don't bother reparsing
-			# TODO add force update flag
-			continue
+			if not args.force_reparse:
+				# don't bother reparsing
+				# TODO add force update flag
+				continue
 
 		details = None
 		try:
