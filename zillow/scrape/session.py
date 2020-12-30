@@ -2,9 +2,13 @@
 import json
 import selenium
 import os
+import random
+import datetime
+import time
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
 
 # for tagging debug images
 DEBUG = False
@@ -24,9 +28,10 @@ class CaptchaError(RuntimeError):
 
 # simple class used to throttle submission rate
 class SubmitThrottle():
-	def __init__(self,period):
+	def __init__(self,period,**kwargs):
 		self.prev_submit_time = None
 		self.period = period
+		self.jitter = kwargs.get('jitter',0)
 
 	def now(self):
 		return datetime.datetime.now().timestamp()
@@ -36,7 +41,9 @@ class SubmitThrottle():
 
 	def block(self):
 		if self.prev_submit_time:
-			while self.period > (self.now() - self.prev_submit_time):
+			rand_jitter = random.randint(-self.jitter,self.jitter)
+			wait_period = self.period + rand_jitter
+			while wait_period > (self.now() - self.prev_submit_time):
 				time.sleep(0.1)
 
 class ZillowSession():
@@ -45,7 +52,7 @@ class ZillowSession():
 
 	def __init__(self):
 		self.driver = None
-		self.throttle = SubmitThrottle(1)
+		self.throttle = SubmitThrottle(5,jitter=3)
 		self.restore_session()
 
 		# if we failed to restore session, make a new one
@@ -64,13 +71,18 @@ class ZillowSession():
 
 	def get(self,url):
 		self.throttle.block()
+		self.throttle.submitted()
 		self.driver.get(url)
 
 	def new_session(self):
 		print('creating new session...')
 		# FIXME this assume you are running from root of repo
 		# FIXME make this smarter
-		self.driver = webdriver.Chrome('./web_drivers/linux64/chrome86/chromedriver')
+		options = Options()
+		# options.add_argument("--headless")
+		self.driver = webdriver.Chrome(
+			'./web_drivers/linux64/chrome86/chromedriver',
+			options=options)
 
 	def restore_session(self):
 		if not os.path.exists(ZillowSession.SESSION_FILEPATH):
