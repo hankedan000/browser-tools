@@ -76,13 +76,21 @@ class ZillowSession():
 
 	def new_session(self):
 		print('creating new session...')
-		# FIXME this assume you are running from root of repo
-		# FIXME make this smarter
+		# build list of Chrome options
 		options = Options()
 		# options.add_argument("--headless")
-		self.driver = webdriver.Chrome(
-			'./web_drivers/linux64/chrome86/chromedriver',
-			options=options)
+
+		# build path to Chrome webdriver
+		BT_WEBDRIVERS_PATH = os.getenv('BT_WEBDRIVERS_PATH')
+		if not BT_WEBDRIVERS_PATH:
+			BT_WEBDRIVERS_PATH = './web_drivers'
+			print("[WARNING] - 'BT_WEBDRIVERS_PATH' environment var is not set. Defaulting to '%s'." % BT_WEBDRIVERS_PATH)
+		driver_path = os.path.join(
+			BT_WEBDRIVERS_PATH,
+			'linux64/chrome86/chromedriver')
+
+		# open the driver
+		self.driver = webdriver.Chrome(driver_path,options=options)
 
 	def restore_session(self):
 		if not os.path.exists(ZillowSession.SESSION_FILEPATH):
